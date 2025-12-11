@@ -9,6 +9,11 @@ authors = ["ZIDOUZI <53157536+ZIDOUZI@users.noreply.github.com>"]
 keywords = ["ini", "desktop_ini"]
 categories = ["command-line-utilities"]
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/{ version }/desktop-ini{ binary-ext }"
+pkg-fmt = "bin"
+bin-dir = "."
+
 [badges]
 maintenance = { status = "passively-maintained" }
 
