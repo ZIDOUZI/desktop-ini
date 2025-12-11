@@ -1,0 +1,23 @@
+[package]
+name = "desktop-ini"
+version = "0.1.3"
+description = "Modify directory's desktop.ini file."
+edition = "2024"
+repository = "https://github.com/ZIDOUZI/desktop-ini"
+license = "GPL-3.0-or-later"
+authors = ["ZIDOUZI <53157536+ZIDOUZI@users.noreply.github.com>"]
+keywords = ["ini", "desktop_ini"]
+categories = ["command-line-utilities"]
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+clap_complete = "4.5.61"
+thiserror = "2.0.17"
+owo-colors = "4.0"
+encoding_rs = "0.8"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55.0"
