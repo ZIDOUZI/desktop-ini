@@ -1,19 +1,79 @@
 use crate::DIRECTORY_CLASS;
 use crate::encoding::{read_to_string_system, write_string_system};
-use crate::error::{Error, IoReason, Result};
+use crate::error::{IoReason, Result};
 use owo_colors::OwoColorize;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::path::PathBuf;
 
-pub fn valid_icon_resource(s: &str) -> bool {
-    match s.rsplit_once(",") {
-        Some((exe, pos)) if pos.parse::<u32>().is_ok() => Path::new(exe).is_file(),
-        None => Path::new(s).is_file(),
-        _ => false,
+fn parse_args(input: &str, path: &str) -> Vec<String> {
+    let mut args: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+
+    let mut iter = input.chars().peekable();
+    while let Some(ch) = iter.next() {
+        match ch {
+            '"' => {
+                if in_quotes && iter.peek().is_none_or(|c| c.is_whitespace()) {
+                    in_quotes = false;
+                } else {
+                    current.push(ch);
+                }
+            },
+            '\\' if in_quotes => match iter.peek() {
+                Some('"') => current.push(iter.next().unwrap_or('"')),
+                Some('\\') => current.push(iter.next().unwrap_or('\\')),
+                _ => current.push('\\'),
+            },
+            '%' => match iter.peek() {
+                Some('1') => {
+                    iter.next();
+                    current.push_str(path);
+                }
+                Some('%') => current.push(iter.next().unwrap_or('%')),
+                _ => current.push('%'),
+            },
+            c if c.is_whitespace() && !in_quotes => {
+                if !current.is_empty() {
+                    args.push(std::mem::take(&mut current));
+                }
+            }
+            c => current.push(c),
+        }
     }
+
+    if !current.is_empty() {
+        args.push(current);
+    }
+
+    args
+}
+
+fn join_args(input: &[String]) -> String {
+    let mut output = String::new();
+    for (idx, arg) in input.iter().enumerate() {
+        if idx > 0 {
+            output.push(' ');
+        }
+
+        if arg.chars().any(char::is_whitespace) {
+            output.push('"');
+            for ch in arg.chars() {
+                if ch == '"' {
+                    output.push('\\');
+                    output.push('"');
+                } else {
+                    output.push(ch);
+                }
+            }
+            output.push('"');
+        } else {
+            output.push_str(arg);
+        }
+    }
+    output
 }
 
 pub struct Ini {
@@ -33,7 +93,11 @@ macro_rules! accessor {
 
     ($get_fn:ident, $set_fn:ident, $section:expr, $key:expr, $in_type:ty) => {
         pub fn $get_fn(&self) -> Result<$in_type> {
-            self.get_into($section, $key)
+            self.dictionary
+                .get($section)
+                .and_then(|map| map.get($key))
+                .ok_or(Error::NoValue)
+                .and_then(|s| $in_type::from_str(s))
         }
 
         accessor!($set_fn, $section, $key, $in_type);
@@ -64,22 +128,6 @@ impl Ini {
             .get(section)
             .and_then(|map| map.get(key))
             .cloned()
-    }
-
-    // used by macro only
-    pub fn get_into<T: FromStr<Err = Error>>(&self, section: &str, key: &str) -> Result<T> {
-        self.dictionary
-            .get(section)
-            .and_then(|map| map.get(key))
-            .ok_or(Error::NoValue)
-            .and_then(|s| T::from_str(s))
-    }
-
-    // never used
-    pub fn get_mut(&mut self, section: &str, key: &str) -> Option<&mut String> {
-        self.dictionary
-            .get_mut(section)
-            .and_then(|map| map.get_mut(key))
     }
 
     pub fn set<T: Display>(&mut self, section: &str, key: &str, value: T) -> Option<String> {
@@ -210,6 +258,18 @@ impl Ini {
         );
     }
 
+    pub fn clear_tags(&mut self) -> Option<String> {
+        self.remove("[{F29F85E0-4FF9-1068-AB91-08002B27B3D9}]", "Prop5")
+    }
+
+    pub fn args(&self, path: &str) -> Option<Vec<String>> {
+        Some(parse_args(&self.get("[.CustomExecution]", "Args")?, path))
+    }
+
+    pub fn set_args(&mut self, args: &[String]) {
+        self.set("[.CustomExecution]", "Args", join_args(args));
+    }
+
     fn ordered(&self) -> Vec<&String> {
         let preferred_sections = [
             "[.ShellClassInfo]",
@@ -268,29 +328,14 @@ impl Debug for Ini {
             )?;
         }
         if let Some(s) = self.info_tip() {
-            writeln!(
-                f,
-                "    {}  {} {s}",
-                "InfoTip:".cyan(),
-                dot.repeat(12)
-            )?;
+            writeln!(f, "    {}  {} {s}", "InfoTip:".cyan(), dot.repeat(12))?;
         }
         if let Some(s) = self.icon_resource() {
-            writeln!(
-                f,
-                "    {} {} {s}",
-                "IconResource:".cyan(),
-                dot.repeat(10)
-            )?;
+            writeln!(f, "    {} {} {s}", "IconResource:".cyan(), dot.repeat(10))?;
         }
         if let Some(tags) = self.tags() {
             let sep = ", ".bright_yellow().bold().to_string();
-            writeln!(
-                f,
-                "{}\n    {}",
-                "Tags:".bright_magenta(),
-                tags.join(&sep)
-            )?;
+            writeln!(f, "{}\n    {}", "Tags:".bright_magenta(), tags.join(&sep))?;
         }
         if let Some(execution) = self.execution() {
             writeln!(
@@ -317,5 +362,18 @@ impl Debug for Ini {
         Display::fmt(&self, f)?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ini::{join_args, parse_args};
+
+    #[test]
+    fn test_args() {
+        let args = r#"%1 a"b"c "a\"bc" aa""#;
+        let args1 = dbg!(parse_args(args, "/a/b/c"));
+        let args1 = dbg!(join_args(&args1));
+        assert_eq!(args1, args.replace("%1", "/a/b/c"));
     }
 }

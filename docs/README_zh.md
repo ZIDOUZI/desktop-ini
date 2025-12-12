@@ -12,6 +12,7 @@
 - **查看** 指定目录的 `desktop.ini` 并以易读格式展示关键信息。
 - **设置** 目录的替代标题、图标、悬停提示、标签（Prop5）、自定义执行命令等字段。
 - **执行** `desktop.ini` 中配置的自定义命令，带可选二次确认。
+- 如果执行需要管理员权限，会自动触发 UAC 弹窗并尝试提升权限后重试。
 - **同步** 当前目录下所有包含 `desktop.ini` 的子目录，将其目录属性设为只读。
 - **注册表集成**：在资源管理器中为自定义目录类注册，使用本程序打开。
 
@@ -57,9 +58,10 @@ desktop-ini set \
   --path <DIR> \
   --name "示例文件夹" \
   --icon "shell32.dll,4" \
-  --tip "这是一个示例" \
+  --info-tip "这是一个示例" \
   --add-tag work --add-tag rust \
-  --run "code ." \
+  --command "code" \
+  --args "%1" \
   --confirm
 ```
 
@@ -67,12 +69,19 @@ desktop-ini set \
 
 - `--name`：设置目录显示名称 (`LocalizedResourceName`)。
 - `--icon`：设置图标 (`IconResource`)，例如 `"shell32.dll,4"`。
-- `--tip`：悬浮提示 (`InfoTip`)。
+- `--info-tip`：悬浮提示 (`InfoTip`)。
 - `--add-tag` / `--remove-tag` / `--clear-tag`：管理标签。
-- `--run`：设置自定义执行命令（在该目录下通过 `cmd /C` 执行）。
+  - `--add-tag` / `--remove-tag` 可以传入多次。
+  - `--add-tag` / `--remove-tag` 也支持逗号分隔，例如 `--tag a,b,c`。
+- `--command`：设置自定义执行命令的可执行文件（写入 `Target`）。
+- `--args`：设置自定义执行命令参数（写入 `Args`）。
+  - `--args` 可以传入多次。
+  - `%1` 会替换为包含 `desktop.ini` 的目录路径。
+  - `%%` 表示字面量 `%`。
+  - 引号用于将包含空格的内容视为一个参数；引号内支持 `\"` 与 `\\`。
 - `--confirm`：启用执行前二次确认；不带该参数且原本已启用时，会关闭确认。
 
-> 使用 `--dry-run` 可以先预览将要写入的 `desktop.ini` 内容和。
+> 使用 `--dry-run` 可以先预览将要写入的 `desktop.ini` 内容。
 
 ### 执行 desktop.ini 中的命令
 
@@ -84,7 +93,10 @@ desktop-ini run --path <DIR>
   - `y/yes`：执行命令。
   - `n/no`：退出。
   - `o/open`：在资源管理器中打开目录。
+  - `f/file`：使用资源管理器中打开 `desktop.ini`。
 - 若 `desktop.ini` 中未配置 `Target`，则程序将直接退出。
+- `Args` 采用“空白分隔 + 引号分组”的规则解析，并支持 `%1`/`%%` 展开。
+- 当 Windows 返回错误码 `740`（需要提升权限）时，会触发 UAC 并通过 `ShellExecuteW` 重试。
 
 ### 批量同步只读属性
 
@@ -134,3 +146,4 @@ cargo build
 - `encoding_rs`：按系统 ANSI 代码页读写文本
 - `thiserror`：错误类型定义
 - `winreg`：Windows 注册表操作
+- `windows-sys`：Windows API 调用

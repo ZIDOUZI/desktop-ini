@@ -1,19 +1,20 @@
-use crate::Command;
 use crate::error::*;
-use crate::ini::{Ini, valid_icon_resource};
+use crate::ini::Ini;
 use crate::sync::check_metadata;
+use crate::Command;
 use owo_colors::OwoColorize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub fn set(path: &mut PathBuf, command: Command, dry_run: bool) -> Result<()> {
     let Command::Set {
         name,
         icon,
-        tip,
-        add_tag,
+        info_tip,
+        tag,
         remove_tag,
         clear_tag,
-        run,
+        command,
+        args,
         confirm,
     } = command
     else {
@@ -37,26 +38,40 @@ pub fn set(path: &mut PathBuf, command: Command, dry_run: bool) -> Result<()> {
         ini.set_icon_resource(icon);
     }
 
-    if let Some(tip) = tip {
+    if let Some(tip) = info_tip {
         ini.set_info_tip(tip);
     }
 
-    if let Some(tags) = add_tag {
-        ini.add_tags(&tags);
+    if !tag.is_empty() {
+        ini.add_tags(
+            &tag
+                .iter()
+                .flat_map(|s| s.split(','))
+                .map(str::to_string)
+                .collect::<Vec<_>>(),
+        );
     }
 
-    if let Some(tags) = remove_tag {
-        ini.remove_tags(&tags);
+    if !remove_tag.is_empty() {
+        ini.remove_tags(
+            &remove_tag
+                .iter()
+                .flat_map(|s| s.split(','))
+                .map(str::to_string)
+                .collect::<Vec<_>>(),
+        );
     }
 
     if clear_tag {
-        ini.set_tags(&[])
+        ini.clear_tags();
     }
 
-    if let Some(run) = run {
-        ini.set_execution(run);
+    if let Some(command) = command {
+        ini.set_execution(command);
         ini.set_directory_class();
     }
+
+    ini.set_args(&args);
 
     if confirm {
         ini.set_confirm_execution(true);
@@ -65,11 +80,23 @@ pub fn set(path: &mut PathBuf, command: Command, dry_run: bool) -> Result<()> {
     }
 
     if dry_run {
-        println!("{}\n{ini}", "Simulation mode. Will write content below:".yellow());
+        println!(
+            "{}\n{:?}",
+            "Simulation mode. Will write content below:".yellow(), ini
+        );
         Ok(())
     } else {
         ini.write_to(path)?;
         println!("{} {}", "desktop.ini updated at".green(), path.display());
         Ok(())
+    }
+}
+
+
+fn valid_icon_resource(s: &str) -> bool {
+    match s.rsplit_once(",") {
+        Some((exe, pos)) if pos.parse::<u32>().is_ok() => Path::new(exe).is_file(),
+        None => Path::new(s).is_file(),
+        _ => false,
     }
 }

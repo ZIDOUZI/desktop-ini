@@ -46,7 +46,7 @@ struct Cli {
     error_action: ErrorAction,
 
     /// dry run all write operation
-    #[arg(short, long, global = true)]
+    #[arg(long, global = true)]
     dry_run: bool,
 
     #[command(subcommand)]
@@ -74,7 +74,7 @@ enum Command {
     /// Set desktop.ini fields for a directory (placeholder)
     Set {
         /// LocalizedResourceName, aka title of this directory
-        #[arg(short, long)]
+        #[arg(short, long, alias = "localized-resource-name")]
         name: Option<String>,
 
         /// IconResource, for example: "shell32.dll,4"
@@ -82,27 +82,31 @@ enum Command {
         icon: Option<String>,
 
         /// InfoTip. show when hover on this directory.
-        #[arg(short, long, value_name = "INFO_TIP")]
-        tip: Option<String>,
+        #[arg(long, value_name = "INFO_TIP", alias = "info", alias = "tip")]
+        info_tip: Option<String>,
 
         /// [{F29F85E0-4FF9-1068-AB91-08002B27B3D9}] Prop5, aka tags/labels.
-        #[arg(short, long, alias = "tag")]
-        add_tag: Option<Vec<String>>,
+        #[arg(short, long, alias = "add-tag")]
+        tag: Vec<String>,
 
         /// remove a tag.
         #[arg(short, long)]
-        remove_tag: Option<Vec<String>>,
+        remove_tag: Vec<String>,
 
         /// clear all tags.
         #[arg(long, conflicts_with_all = ["add_tag", "remove_tag"])]
         clear_tag: bool,
 
-        // execution path
+        /// execution path
         #[arg(short, long)]
-        run: Option<String>,
+        command: Option<String>,
+
+        /// execution args. use %1 to present the folder where desktop.ini in.
+        #[arg(short, long)]
+        args: Vec<String>,
         
-        // confirm execution
-        #[arg(short, long)]
+        /// confirm execution
+        #[arg(long)]
         confirm: bool,
     },
 
