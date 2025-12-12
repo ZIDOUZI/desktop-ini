@@ -19,6 +19,7 @@ mod windows {
         let (class_key, _) = hkcu.create_subkey(format!(r"Software\Classes\{DIRECTORY_CLASS}"))?;
 
         class_key.set_value("", &"Desktop.ini Custom Open Handler")?;
+        class_key.set_value("CanUseForDirectory", &"")?;
 
         let (command_key, _) = class_key.create_subkey(r"Shell\open\command")?;
 

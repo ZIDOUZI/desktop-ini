@@ -12,6 +12,7 @@ mod run;
 mod set;
 mod setup;
 mod sync;
+mod platform;
 
 use crate::error::{Error, IoReason};
 use crate::ini::Ini;
