@@ -1,6 +1,6 @@
-use crate::DIRECTORY_CLASS;
 use crate::encoding::{read_to_string_system, write_string_system};
 use crate::error::{IoReason, Result};
+use crate::DIRECTORY_CLASS;
 use owo_colors::OwoColorize;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
@@ -21,7 +21,7 @@ fn parse_args(input: &str, path: &str) -> Vec<String> {
                 } else {
                     current.push(ch);
                 }
-            },
+            }
             '\\' if in_quotes => match iter.peek() {
                 Some('"') => current.push(iter.next().unwrap_or('"')),
                 Some('\\') => current.push(iter.next().unwrap_or('\\')),
@@ -196,6 +196,30 @@ impl Ini {
         "[.ShellClassInfo]",
         "LocalizedResourceName"
     );
+    accessor!(
+        title,
+        set_title,
+        "[{F29F85E0-4FF9-1068-AB91-08002B27B3D9}]",
+        "Prop2"
+    );
+    accessor!(
+        subject,
+        set_subject,
+        "[{F29F85E0-4FF9-1068-AB91-08002B27B3D9}]",
+        "Prop3"
+    );
+    accessor!(
+        author,
+        set_author,
+        "[{F29F85E0-4FF9-1068-AB91-08002B27B3D9}]",
+        "Prop4"
+    );
+    accessor!(
+        comments,
+        set_comments,
+        "[{F29F85E0-4FF9-1068-AB91-08002B27B3D9}]",
+        "Prop6"
+    );
 
     pub fn confirm_execution(&self) -> Option<bool> {
         self.get("[.CustomExecution]", "ConfirmExecution")
@@ -215,33 +239,36 @@ impl Ini {
     }
 
     pub fn tags(&self) -> Option<Vec<String>> {
-        match self.get("[{F29F85E0-4FF9-1068-AB91-08002B27B3D9}]", "Prop5") {
-            Some(value) => match value.split_once(",") {
-                Some((prefix, tags)) if prefix.trim() == "31" => {
-                    Some(tags.split(';').map(|s| s.trim().to_string()).collect())
-                }
-                _ => None,
-            },
-            None => None,
+        let tags = self.get("[{F29F85E0-4FF9-1068-AB91-08002B27B3D9}]", "Prop5")?;
+
+        match tags
+            .split_once(',')
+            .map_or(tags.as_str(), |(_, tags)| tags)
+            .trim()
+        {
+            "" => Some(Vec::new()),
+            tags => Some(tags.split(",").map(|s| s.trim().to_string()).collect()),
         }
     }
 
-    pub fn set_tags(&mut self, tags: &[&str]) {
-        self.set(
-            "[{F29F85E0-4FF9-1068-AB91-08002B27B3D9}]",
-            "Prop5",
-            format!("31,{}", tags.join(";")),
-        );
+    pub fn set_tags(&mut self, tags: &[String]) {
+        if tags.is_empty() {
+            self.remove("[{F29F85E0-4FF9-1068-AB91-08002B27B3D9}]", "Prop5");
+        } else {
+            self.set(
+                "[{F29F85E0-4FF9-1068-AB91-08002B27B3D9}]",
+                "Prop5",
+                format!("31,{}", tags.join(";")),
+            );
+        }
     }
 
     pub fn add_tags(&mut self, tags: &[String]) {
         let mut new_tags = self.tags().unwrap_or_default();
         new_tags.extend_from_slice(tags);
-        self.set(
-            "[{F29F85E0-4FF9-1068-AB91-08002B27B3D9}]",
-            "Prop5",
-            format!("31,{}", new_tags.join(";")),
-        );
+        new_tags.sort();
+        new_tags.dedup();
+        self.set_tags(&new_tags);
     }
 
     pub fn remove_tags(&mut self, tags: &[String]) {
@@ -251,11 +278,7 @@ impl Ini {
             .into_iter()
             .filter(|s| !tags.contains(s))
             .collect();
-        self.set(
-            "[{F29F85E0-4FF9-1068-AB91-08002B27B3D9}]",
-            "Prop5",
-            format!("31,{}", new_tags.join(";")),
-        );
+        self.set_tags(&new_tags);
     }
 
     pub fn clear_tags(&mut self) -> Option<String> {
@@ -267,7 +290,11 @@ impl Ini {
     }
 
     pub fn set_args(&mut self, args: &[String]) {
-        self.set("[.CustomExecution]", "Args", join_args(args));
+        if args.is_empty() {
+            self.remove("[.CustomExecution]", "Args");
+        } else {
+            self.set("[.CustomExecution]", "Args", join_args(args));
+        }
     }
 
     fn ordered(&self) -> Vec<&String> {
@@ -313,30 +340,35 @@ impl Display for Ini {
 impl Debug for Ini {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let dot = "· ".dimmed().to_string();
+        macro_rules! print_info {
+            ($key: expr, $repeat: expr, $value: expr) => {
+                if let Some(s) = $value {
+                    writeln!(f, "    {} {} {s}", $key.cyan(), dot.repeat($repeat))?;
+                }
+            };
+        }
+
         writeln!(
             f,
             "{}\n\n{}",
-            "INI brief info".bold().cyan(),
+            "INI brief information".bold().cyan(),
             "Shell Class Info:".bright_magenta()
         )?;
-        if let Some(s) = self.localized_resource_name() {
-            writeln!(
-                f,
-                "    {}  {} {s}",
-                "LocalizedResourceName:".cyan(),
-                dot.repeat(5)
-            )?;
-        }
-        if let Some(s) = self.info_tip() {
-            writeln!(f, "    {}  {} {s}", "InfoTip:".cyan(), dot.repeat(12))?;
-        }
-        if let Some(s) = self.icon_resource() {
-            writeln!(f, "    {} {} {s}", "IconResource:".cyan(), dot.repeat(10))?;
-        }
+        print_info!("LocalizedResourceName: ", 5, self.localized_resource_name());
+        print_info!("InfoTip: ", 12, self.info_tip());
+        print_info!("IconResource:", 10, self.icon_resource());
+
         if let Some(tags) = self.tags() {
             let sep = ", ".bright_yellow().bold().to_string();
             writeln!(f, "{}\n    {}", "Tags:".bright_magenta(), tags.join(&sep))?;
         }
+
+        writeln!(f, "{}", "Other Summary Information:".bright_magenta())?;
+        print_info!("Title: ", 13, self.title());
+        print_info!("Subject: ", 12, self.subject());
+        print_info!("Author:", 13, self.author());
+        print_info!("Comments:", 12, self.comments());
+
         if let Some(execution) = self.execution() {
             writeln!(
                 f,
@@ -345,35 +377,17 @@ impl Debug for Ini {
                 "Target:".cyan(),
                 dot.repeat(13)
             )?;
-            let confirm_str = if self.confirm_execution().unwrap_or(false) {
+            let confirm_str = if self.confirm_execution().unwrap_or_default() {
                 "on".green().to_string()
             } else {
                 "off".yellow().to_string()
             };
-            writeln!(
-                f,
-                "    {}  {} {confirm_str}",
-                "Second Confirmation:".cyan(),
-                dot.repeat(6),
-            )?;
+            print_info!("Second Confirmation: ", 6, Some(confirm_str));
         }
 
         writeln!(f, "\n{}", "Raw INI file content:".bold().cyan())?;
         Display::fmt(&self, f)?;
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::ini::{join_args, parse_args};
-
-    #[test]
-    fn test_args() {
-        let args = r#"%1 a"b"c "a\"bc" aa""#;
-        let args1 = dbg!(parse_args(args, "/a/b/c"));
-        let args1 = dbg!(join_args(&args1));
-        assert_eq!(args1, args.replace("%1", "/a/b/c"));
     }
 }

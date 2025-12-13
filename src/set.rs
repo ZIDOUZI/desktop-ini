@@ -1,7 +1,7 @@
+use crate::Command;
 use crate::error::*;
 use crate::ini::Ini;
 use crate::sync::check_metadata;
-use crate::Command;
 use owo_colors::OwoColorize;
 use std::path::{Path, PathBuf};
 
@@ -16,6 +16,10 @@ pub fn set(path: &mut PathBuf, command: Command, dry_run: bool) -> Result<()> {
         command,
         args,
         confirm,
+        title,
+        subject,
+        author,
+        comments,
     } = command
     else {
         unreachable!("other enum entry shouldn't passed in");
@@ -28,9 +32,15 @@ pub fn set(path: &mut PathBuf, command: Command, dry_run: bool) -> Result<()> {
 
     let mut ini = Ini::read_from(path)?;
 
-    if let Some(name) = name {
-        ini.set_localized_resource_name(name);
+    macro_rules! set {
+        ($value:expr, $set_fn:ident) => {
+            if let Some(value) = $value {
+                ini.$set_fn(value);
+            }
+        };
     }
+
+    set!(name, set_localized_resource_name);
 
     if let Some(icon) = icon
         && valid_icon_resource(&icon)
@@ -38,14 +48,11 @@ pub fn set(path: &mut PathBuf, command: Command, dry_run: bool) -> Result<()> {
         ini.set_icon_resource(icon);
     }
 
-    if let Some(tip) = info_tip {
-        ini.set_info_tip(tip);
-    }
+    set!(info_tip, set_info_tip);
 
     if !tag.is_empty() {
         ini.add_tags(
-            &tag
-                .iter()
+            &tag.iter()
                 .flat_map(|s| s.split(','))
                 .map(str::to_string)
                 .collect::<Vec<_>>(),
@@ -71,7 +78,12 @@ pub fn set(path: &mut PathBuf, command: Command, dry_run: bool) -> Result<()> {
         ini.set_directory_class();
     }
 
-    ini.set_args(&args);
+    set!(args.as_deref(), set_args);
+
+    set!(title, set_title);
+    set!(subject, set_subject);
+    set!(author, set_author);
+    set!(comments, set_comments);
 
     if confirm {
         ini.set_confirm_execution(true);
@@ -82,7 +94,8 @@ pub fn set(path: &mut PathBuf, command: Command, dry_run: bool) -> Result<()> {
     if dry_run {
         println!(
             "{}\n{:?}",
-            "Simulation mode. Will write content below:".yellow(), ini
+            "Simulation mode. Will write content below:".yellow(),
+            ini
         );
         Ok(())
     } else {
@@ -91,7 +104,6 @@ pub fn set(path: &mut PathBuf, command: Command, dry_run: bool) -> Result<()> {
         Ok(())
     }
 }
-
 
 fn valid_icon_resource(s: &str) -> bool {
     match s.rsplit_once(",") {

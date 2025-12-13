@@ -76,6 +76,10 @@ Common options:
 - `--name`: Set directory display name (`LocalizedResourceName`).
 - `--icon`: Set icon (`IconResource`), for example `"shell32.dll,4"`.
 - `--info-tip`: Set hover text (`InfoTip`).
+- `--title`: Set title (stored as `Prop2`).
+- `--subject`: Set subject (stored as `Prop3`).
+- `--author`: Set author (stored as `Prop4`).
+- `--comments`: Set comments (stored as `Prop6`).
 - `--add-tag` / `--remove-tag` / `--clear-tag`: Manage tags stored in Prop5.
   - You can pass multiple `--add-tag` / `--remove-tag`.
   - `--add-tag` and `--remove-tag` also accept comma-separated values.

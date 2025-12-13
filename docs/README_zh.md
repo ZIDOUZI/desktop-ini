@@ -70,6 +70,10 @@ desktop-ini set \
 - `--name`：设置目录显示名称 (`LocalizedResourceName`)。
 - `--icon`：设置图标 (`IconResource`)，例如 `"shell32.dll,4"`。
 - `--info-tip`：悬浮提示 (`InfoTip`)。
+- `--title`：标题（写入 `Prop2`）。
+- `--subject`：主题/副标题（写入 `Prop3`）。
+- `--author`：作者（写入 `Prop4`）。
+- `--comments`：备注（写入 `Prop6`）。
 - `--add-tag` / `--remove-tag` / `--clear-tag`：管理标签。
   - `--add-tag` / `--remove-tag` 可以传入多次。
   - `--add-tag` / `--remove-tag` 也支持逗号分隔，例如 `--tag a,b,c`。

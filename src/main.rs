@@ -94,8 +94,24 @@ enum Command {
         remove_tag: Vec<String>,
 
         /// clear all tags.
-        #[arg(long, conflicts_with_all = ["add_tag", "remove_tag"])]
+        #[arg(long, conflicts_with_all = ["tag", "remove_tag"])]
         clear_tag: bool,
+
+        /// title
+        #[arg(long)]
+        title: Option<String>,
+
+        /// subject. you can use it as subtitle.
+        #[arg(long)]
+        subject: Option<String>,
+
+        /// author
+        #[arg(long)]
+        author: Option<String>,
+
+        /// comments
+        #[arg(long)]
+        comments: Option<String>,
 
         /// execution path
         #[arg(short, long)]
@@ -103,7 +119,7 @@ enum Command {
 
         /// execution args. use %1 to present the folder where desktop.ini in.
         #[arg(short, long)]
-        args: Vec<String>,
+        args: Option<Vec<String>>,
         
         /// confirm execution
         #[arg(long)]

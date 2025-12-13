@@ -21,9 +21,13 @@ mod windows {
         class_key.set_value("", &"Desktop.ini Custom Open Handler")?;
         class_key.set_value("CanUseForDirectory", &"")?;
 
-        let (command_key, _) = class_key.create_subkey(r"Shell\open\command")?;
+        let (open_key, _) = class_key.create_subkey(r"Shell\open\command")?;
 
-        command_key.set_value("", &format!(r#""{exe_str}" run --path "%1""#))?;
+        open_key.set_value("", &format!(r#""{exe_str}" run --path "%1""#))?;
+
+        let (edit_key, _) = class_key.create_subkey(r"Shell\edit\command")?;
+
+        edit_key.set_value("", &format!(r#"explorer "%1""#))?;
 
         println!("{}", "Registry setup completed.".green());
         Ok(())
