@@ -266,7 +266,7 @@ impl Ini {
     pub fn add_tags(&mut self, tags: &[String]) {
         let mut new_tags = self.tags().unwrap_or_default();
         new_tags.extend_from_slice(tags);
-        new_tags.sort();
+        new_tags.sort_unstable();
         new_tags.dedup();
         self.set_tags(&new_tags);
     }

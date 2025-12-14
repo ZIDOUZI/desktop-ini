@@ -2,7 +2,8 @@ use std::path::PathBuf;
 use std::{env, io};
 
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
-use clap_complete::{Shell, generate};
+use clap_complete::{generate, shells, Shell};
+use clap_complete_nushell::Nushell;
 use owo_colors::OwoColorize;
 
 mod encoding;
@@ -13,6 +14,7 @@ mod set;
 mod setup;
 mod sync;
 mod platform;
+mod interactive;
 
 use crate::error::{Error, IoReason};
 use crate::ini::Ini;
@@ -120,14 +122,27 @@ enum Command {
         /// execution args. use %1 to present the folder where desktop.ini in.
         #[arg(short, long)]
         args: Option<Vec<String>>,
-        
+
         /// confirm execution
         #[arg(long)]
         confirm: bool,
     },
 
+    /// Interactive set mode
+    Interactive,
+
     /// Generate completions for shell
-    Completion,
+    Completion {
+        #[command(subcommand)]
+        shell: CompletionShell
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum CompletionShell {
+    PowerShell,
+    Bash,
+    NuShell,
 }
 
 fn main() {
@@ -158,7 +173,8 @@ fn main() {
         None => Cli::command()
             .print_help()
             .reason(|| "print help message", None),
-        Some(Command::Completion) => {
+        Some(Command::Interactive) => interactive::interactive(&mut path, cli.dry_run),
+        Some(Command::Completion { shell }) => {
             let mut cmd = Cli::command();
             let cmd_name = if let Ok(p) = current_exe()
                 && let Some(n) = p.file_stem()
@@ -167,7 +183,11 @@ fn main() {
             } else {
                 cmd.get_name().to_string()
             };
-            generate(Shell::PowerShell, &mut cmd, cmd_name, &mut io::stdout());
+            match shell {
+                CompletionShell::PowerShell => generate(Shell::PowerShell, &mut cmd, cmd_name, &mut io::stdout()),
+                CompletionShell::Bash => generate(Shell::Bash, &mut cmd, cmd_name, &mut io::stdout()),
+                CompletionShell::NuShell => generate(Nushell, &mut cmd, cmd_name, &mut io::stdout()),
+            }
             Ok(())
         }
     };
